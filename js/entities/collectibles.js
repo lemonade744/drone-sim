@@ -1,7 +1,20 @@
 import * as THREE from 'three';
+import { isPointFree } from './world.js';
 
-export function buildCollectibles(map) {
+export function buildCollectibles(map, colliders = []) {
+  // Если карта задаёт генератор — вызываем его
+  let starsData = map.stars ?? [];
+  let ringsData = map.rings ?? [];
+
+  if (typeof map.randomStars === 'function') {
+    starsData = map.randomStars({ colliders, isPointFree });
+  }
+  if (typeof map.randomRings === 'function') {
+    ringsData = map.randomRings({ colliders, isPointFree });
+  }
+
   const items = [];
+  // ... дальше как было, только используем starsData/ringsData
 
   if (map.mode === 'stars' && map.stars) {
     map.stars.forEach((s, idx) => {

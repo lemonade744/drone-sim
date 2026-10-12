@@ -86,3 +86,16 @@ function makeBuilding({ x, z, w, h, d, color = 0x888899 }) {
   const r = Math.max(w, d) * 0.55;
   return { mesh, collider: { x, z, r, top: h } };
 }
+
+// Проверка: свободна ли точка (не внутри коллайдера)
+export function isPointFree(x, y, z, colliders, radius = 3) {
+  for (const c of colliders) {
+    const dx = x - c.x, dz = z - c.z;
+    const rr = c.r + radius;
+    if (dx*dx + dz*dz >= rr*rr) continue;
+    // Если мы выше верхушки — точка свободна
+    if (y > c.top + radius) continue;
+    return false;
+  }
+  return true;
+}
