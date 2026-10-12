@@ -1,20 +1,13 @@
 import * as THREE from 'three';
-import { clamp } from '../utils/math.js';
+import { updateMultirotor } from './multirotor.js';
+import { updateAirplane } from './airplane.js';
 
 const GRAVITY = 9.81;
-const HOVER_THRUST = GRAVITY;
-const LINEAR_DRAG = 0.5;
-const VERT_DRAG = 0.15;
-const ANGULAR_DRAG = 3.2;
-const PITCH_ACCEL = 4.0;
-const ROLL_ACCEL = 3.5;
-const YAW_SPEED = 1.8;
-const MAX_PITCH = Math.PI * 75 / 180;
-const MAX_ROLL = Math.PI * 70 / 180;
 const LAND_VSPEED_MAX = 4.0;
 const LAND_TILT_MAX = Math.PI * 30 / 180;
 const CRASH_VSPEED = 7.0;
-const DRONE_RADIUS = 1.0;
+const DRONE_RADIUS = 1.2;
+const GROUND_Y = 1.2;
 
 export class Flight {
   constructor(drone, colliders, map) {
@@ -27,24 +20,38 @@ export class Flight {
       yaw: 0,
       pitch: 0,
       roll: 0,
-      angVel: { pitch: 0, roll: 0 },
-      lastThrottle: HOVER_THRUST,
+      angVel: { pitch: 0, roll: 0, yaw: 0 },
+      lastThrottle: GRAVITY,
     };
 
     this.status = 'flying';
-    this.standTop = 1.2;
+    this.standTop = GROUND_Y;
+
+    this.catapultPos = new THREE.Vector3();
+    this.catapultPitch = 0;
+    this.catapultYaw = 0;
+    this.launchGraceTimer = 0;
 
     const sp = this.findSafeSpawn();
     this.spawnPoint = sp;
     this._placeAtSpawn();
+
+    if (this.drone.model.startOnGround) {
+      this._placeOnCatapult();
+    }
   }
 
   findSafeSpawn() {
+    const startOnGround = this.drone.model.startOnGround;
     const preferred = this.map.spawn ?? { x: 0, y: 12, z: 0 };
-    if (this._isFree(preferred.x, preferred.y, preferred.z)) return { ...preferred };
+    const preferredY = startOnGround ? this.drone.bottomOffset : preferred.y;
+
+    if (this._isFree(preferred.x, preferredY, preferred.z)) {
+      return { x: preferred.x, y: preferredY, z: preferred.z };
+    }
 
     const cx = preferred.x, cz = preferred.z;
-    const cy = Math.max(preferred.y, 15);
+    const cy = startOnGround ? this.drone.bottomOffset : Math.max(preferred.y, 20);
     for (let ring = 1; ring <= 20; ring++) {
       const r = ring * 8;
       const steps = Math.max(8, ring * 6);
@@ -57,10 +64,24 @@ export class Flight {
     }
     let maxTop = 0;
     for (const c of this.colliders) if (c.top > maxTop) maxTop = c.top;
-    return { x: 0, y: maxTop + 20, z: 0 };
+    return {
+      x: 0,
+      y: startOnGround ? this.drone.bottomOffset : maxTop + 25,
+      z: 0,
+    };
   }
 
   _isFree(x, y, z) {
+    if (this.drone.model.startOnGround) {
+      for (const c of this.colliders) {
+        const dx = x - c.x, dz = z - c.z;
+        const rr = c.r + DRONE_RADIUS + 1.5;
+        if (dx*dx + dz*dz >= rr*rr) continue;
+        if (c.top > y - this.drone.bottomOffset + 0.5) return false;
+      }
+      return true;
+    }
+
     if (y < 3) return false;
     const droneBottom = y - this.drone.bottomOffset;
     for (const c of this.colliders) {
@@ -75,18 +96,64 @@ export class Flight {
 
   _placeAtSpawn() {
     const sp = this.spawnPoint;
+    const yaw = this.map.spawn?.yaw ?? 0;
     this.drone.group.position.set(sp.x, sp.y, sp.z);
     this.state.vel.set(0, 0, 0);
-    this.state.yaw = this.state.pitch = this.state.roll = 0;
+    this.state.yaw = yaw;
+    this.state.pitch = 0;
+    this.state.roll = 0;
     this.state.angVel.pitch = 0;
     this.state.angVel.roll = 0;
-    this.drone.group.rotation.set(0, 0, 0, 'YXZ');
+    this.state.angVel.yaw = 0;
+    this.drone.group.rotation.set(0, yaw, 0, 'YXZ');
+  }
+
+  _placeOnCatapult() {
+    const sp = this.spawnPoint;
+    const yaw = this.map.spawn?.yaw ?? 0;
+    // Угол катапульты: +20° — нос вверх (положительный pitch = нос вверх)
+    const launchPitch = +20 * Math.PI / 180;
+
+    this.catapultPitch = launchPitch;
+    this.catapultYaw = yaw;
+
+    // Дрон на верхней части катапульты
+    this.catapultPos.set(sp.x, this.drone.bottomOffset + 0.8, sp.z);
+    this.drone.group.position.copy(this.catapultPos);
+    this.drone.group.rotation.set(this.catapultPitch, this.catapultYaw, 0, 'YXZ');
+
+    this.state.pitch = this.catapultPitch;
+    this.state.yaw = this.catapultYaw;
+    this.state.roll = 0;
+    this.state.vel.set(0, 0, 0);
+    this.state.angVel.pitch = 0;
+    this.state.angVel.roll = 0;
+    this.state.angVel.yaw = 0;
+
+    this.status = 'on_catapult';
+    if (this.drone.catapult) this.drone.catapult.visible = true;
+  }
+
+  launchFromCatapult() {
+    // Умеренная скорость — 14 м/с
+    const launchSpeed = 14;
+    const euler = new THREE.Euler(this.catapultPitch, this.catapultYaw, 0, 'YXZ');
+    const forward = new THREE.Vector3(0, 0, -1).applyEuler(euler);
+    this.state.vel.copy(forward).multiplyScalar(launchSpeed);
+
+    this.status = 'flying';
+    this.launchGraceTimer = 1.0;
+    if (this.drone.catapult) this.drone.catapult.visible = false;
   }
 
   respawn() {
     this.status = 'flying';
-    this.standTop = 1.2;
+    this.standTop = GROUND_Y;
+    this.launchGraceTimer = 0;
     this._placeAtSpawn();
+    if (this.drone.model.startOnGround) {
+      this._placeOnCatapult();
+    }
   }
 
   hitsObstacle(px, py, pz) {
@@ -114,6 +181,9 @@ export class Flight {
   update(dt, ctrl) {
     const { drone, state } = this;
 
+    if (this.launchGraceTimer > 0) this.launchGraceTimer -= dt;
+
+    // Упавший
     if (this.status === 'crashed') {
       state.vel.x *= 0.95;
       state.vel.z *= 0.95;
@@ -130,6 +200,27 @@ export class Flight {
       return;
     }
 
+    // На катапульте
+    if (this.status === 'on_catapult') {
+      drone.group.position.copy(this.catapultPos);
+      drone.group.rotation.set(this.catapultPitch, this.catapultYaw, 0, 'YXZ');
+      state.vel.set(0, 0, 0);
+      state.pitch = this.catapultPitch;
+      state.yaw = this.catapultYaw;
+      state.roll = 0;
+      state.angVel.pitch = 0;
+      state.angVel.roll = 0;
+      state.angVel.yaw = 0;
+
+      if (ctrl.thrust > 0) {
+        this.launchFromCatapult();
+      } else {
+        drone.spinRotors(dt, 0);
+        return;
+      }
+    }
+
+    // Сел
     if (this.status === 'landed') {
       if (ctrl.thrust > 0) {
         this.status = 'flying';
@@ -138,37 +229,18 @@ export class Flight {
         state.vel.set(0, 0, 0);
         state.angVel.pitch = 0;
         state.angVel.roll = 0;
-        drone.spinRotors(dt, 0.2);
+        state.angVel.yaw = 0;
+        drone.spinRotors(dt, 0);
         return;
       }
     }
 
-    // угловая динамика
-    state.angVel.pitch += ctrl.pitch * PITCH_ACCEL * dt;
-    state.angVel.roll  += ctrl.roll  * ROLL_ACCEL  * dt;
-    state.angVel.pitch *= Math.exp(-ANGULAR_DRAG * dt);
-    state.angVel.roll  *= Math.exp(-ANGULAR_DRAG * dt);
-    state.pitch += state.angVel.pitch * dt;
-    state.roll  += state.angVel.roll  * dt;
-    state.pitch = clamp(state.pitch, -MAX_PITCH, MAX_PITCH);
-    state.roll  = clamp(state.roll,  -MAX_ROLL,  MAX_ROLL);
-    state.yaw  += ctrl.yaw * YAW_SPEED * dt;
-
-    // тяга
-    let throttle = HOVER_THRUST * (1 + 0.9 * ctrl.thrust);
-    throttle = Math.max(0, throttle);
-    state.lastThrottle = throttle;
-
-    const euler = new THREE.Euler(state.pitch, state.yaw, state.roll, 'YXZ');
-    const thrustDir = new THREE.Vector3(0, 1, 0).applyEuler(euler);
-
-    const acc = new THREE.Vector3();
-    acc.addScaledVector(thrustDir, throttle);
-    acc.y -= GRAVITY;
-    acc.x -= state.vel.x * LINEAR_DRAG;
-    acc.z -= state.vel.z * LINEAR_DRAG;
-    acc.y -= state.vel.y * VERT_DRAG;
-    state.vel.addScaledVector(acc, dt);
+    // Физика
+    if (drone.model.flightModel === 'airplane') {
+      updateAirplane(dt, ctrl, drone, state, this.status);
+    } else {
+      updateMultirotor(dt, ctrl, drone, state, this.status);
+    }
 
     const prevX = drone.group.position.x;
     const prevY = drone.group.position.y;
@@ -179,6 +251,7 @@ export class Flight {
     const py = drone.group.position.y;
     const pz = drone.group.position.z;
 
+    // Коллизия с объектами
     if (this.hitsObstacle(px, py, pz)) {
       drone.group.position.set(prevX, prevY, prevZ);
       state.vel.multiplyScalar(0.2);
@@ -188,40 +261,59 @@ export class Flight {
       return;
     }
 
-    const groundY = 1.2;
-    const objTop = this.surfaceTopUnder(px, pz);
+    // Касание земли / поверхности (только если grace-таймер кончился)
+    if (this.launchGraceTimer <= 0) {
+      const objTop = this.surfaceTopUnder(px, pz);
+      const bottomY = py - this.drone.bottomOffset;
 
-    if (objTop > 0.5 && py <= objTop + this.drone.bottomOffset) {
-      drone.group.position.y = objTop + this.drone.bottomOffset;
-      this.handleTouchdown(true, objTop + this.drone.bottomOffset);
-    } else if (py <= groundY) {
-      drone.group.position.y = groundY;
-      this.handleTouchdown(false, groundY);
+      if (objTop > 0.5 && bottomY <= objTop + 0.4) {
+        drone.group.position.y = objTop + this.drone.bottomOffset;
+        this.handleTouchdown(true, objTop + this.drone.bottomOffset);
+      } else if (bottomY <= 0) {
+        drone.group.position.y = this.drone.bottomOffset;
+        this.handleTouchdown(false, this.drone.bottomOffset);
+      }
+    } else {
+      if (drone.group.position.y < this.drone.bottomOffset) {
+        drone.group.position.y = this.drone.bottomOffset;
+        if (state.vel.y < 0) state.vel.y = 0;
+      }
     }
 
-    if (drone.group.position.y > 200) {
-      drone.group.position.y = 200;
+    // Потолок карты
+    if (drone.group.position.y > 300) {
+      drone.group.position.y = 300;
       if (state.vel.y > 0) state.vel.y = 0;
     }
 
     drone.group.rotation.set(state.pitch, state.yaw, state.roll, 'YXZ');
-    drone.spinRotors(dt, throttle / (2 * GRAVITY));
   }
 
   handleTouchdown(onObject, standY) {
-    const { state } = this;
+    const { state, drone } = this;
     const vSpeed = Math.abs(state.vel.y);
     const tilt = Math.max(Math.abs(state.pitch), Math.abs(state.roll));
     const horizSpeed = Math.hypot(state.vel.x, state.vel.z);
 
+    const isPlane = drone.model.flightModel === 'airplane';
+    const maxTilt    = isPlane ? Math.PI * 20 / 180 : LAND_TILT_MAX;
+    const maxVSpeed  = isPlane ? 5 : LAND_VSPEED_MAX;
+    const maxHSpeed  = isPlane ? 25 : 3;
+    const crashVSpeed = isPlane ? 10 : CRASH_VSPEED;
+    const crashHSpeed = isPlane ? 45 : 6;
+
     const doCrash =
-      vSpeed > CRASH_VSPEED ||
-      tilt > LAND_TILT_MAX * 1.6 ||
-      horizSpeed > 6;
+      vSpeed > crashVSpeed ||
+      tilt > maxTilt * 1.6 ||
+      horizSpeed > crashHSpeed;
 
     if (doCrash) { this.crash(); return; }
 
-    const softLand = vSpeed < LAND_VSPEED_MAX && tilt < LAND_TILT_MAX && horizSpeed < 3;
+    const softLand =
+      vSpeed < maxVSpeed &&
+      tilt < maxTilt &&
+      horizSpeed < maxHSpeed;
+
     if (softLand) {
       this.status = 'landed';
       this.standTop = standY;
@@ -236,6 +328,6 @@ export class Flight {
   crash() {
     if (this.status === 'crashed') return;
     this.status = 'crashed';
-    this.standTop = 1.2;
+    this.standTop = GROUND_Y;
   }
 }

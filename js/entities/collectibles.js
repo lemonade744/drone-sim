@@ -17,7 +17,6 @@ export function buildCollectibles(map) {
       mesh.position.set(s.x, s.y, s.z);
       mesh.castShadow = true;
 
-      // Ореол
       const halo = new THREE.Mesh(
         new THREE.SphereGeometry(2.0, 12, 12),
         new THREE.MeshBasicMaterial({ color: 0xffdd33, transparent: true, opacity: 0.18 })
@@ -27,6 +26,8 @@ export function buildCollectibles(map) {
       items.push({
         kind: 'star',
         mesh,
+        halo,
+        mat,
         pos: new THREE.Vector3(s.x, s.y, s.z),
         radius: 2.5,
         collected: false,
@@ -50,7 +51,6 @@ export function buildCollectibles(map) {
       if (r.rotation) mesh.rotation.set(...r.rotation);
       mesh.castShadow = true;
 
-      // Внутренний "диск" для читаемости
       const disc = new THREE.Mesh(
         new THREE.RingGeometry((r.radius ?? 3.5) - 0.5, (r.radius ?? 3.5) - 0.1, 24),
         new THREE.MeshBasicMaterial({ color: 0x00e0ff, transparent: true, opacity: 0.25, side: THREE.DoubleSide })
@@ -61,25 +61,44 @@ export function buildCollectibles(map) {
       items.push({
         kind: 'ring',
         mesh,
+        disc,
+        mat: ringMat,
         pos: new THREE.Vector3(r.x, r.y, r.z),
-        radius: (r.radius ?? 3.5) * 0.9, // для прохождения — по внутреннему радиусу
+        radius: (r.radius ?? 3.5) * 0.9,
         collected: false,
         index: idx,
       });
     });
   }
 
+  // === Настройки поведения ===
+  const REMOVE_COLLECTED = true;   // true — собранные исчезают; false — становятся тусклыми
+
+  function markCollected(it) {
+    if (REMOVE_COLLECTED) {
+      it.mesh.visible = false;
+    } else {
+      it.mat.emissiveIntensity = 0.1;
+      it.mat.color.setHex(0x444450);
+      it.mat.emissive.setHex(0x000000);
+      if (it.halo) it.halo.material.opacity = 0.04;
+      if (it.disc) it.disc.material.opacity = 0.04;
+    }
+  }
+
   return {
     items,
-    _prevInside: new Map(), // item -> bool
     isComplete() {
       return items.every(it => it.collected);
     },
     update(dt, dronePos, onCollect) {
       const t = performance.now() * 0.001;
+      if (!this._prevInside) this._prevInside = new Map();
+
       for (const it of items) {
         if (it.collected) continue;
-        // Вращаем звезду, для кольца — лёгкое покачивание
+
+        // Анимация
         if (it.kind === 'star') {
           it.mesh.rotation.y += dt * 1.2;
           it.mesh.rotation.x = Math.sin(t) * 0.3;
@@ -92,19 +111,34 @@ export function buildCollectibles(map) {
         if (it.kind === 'star') {
           if (d < it.radius) {
             it.collected = true;
-            it.mesh.visible = false;
+            markCollected(it);
             onCollect(it);
           }
         } else {
-          // Кольцо: "прошёл сквозь" = был близко И вышел за радиус
+          // Кольцо: был внутри → вышел → засчитано
           const inside = d < it.radius;
           const was = this._prevInside.get(it) ?? false;
           if (was && !inside && d < it.radius * 1.5) {
-            // вышел из зоны — считаем прохождение
             it.collected = true;
+            markCollected(it);
             onCollect(it);
           }
           this._prevInside.set(it, inside);
+        }
+      }
+    },
+    reset() {
+      if (this._prevInside) this._prevInside.clear();
+      for (const it of items) {
+        it.collected = false;
+        it.mesh.visible = true;
+        // Возвращаем яркость, если использовался режим "тускнеют"
+        if (!REMOVE_COLLECTED) {
+          it.mat.emissiveIntensity = 0.8;
+          it.mat.color.setHex(it.kind === 'star' ? 0xffdd33 : 0x00e0ff);
+          it.mat.emissive.setHex(it.kind === 'star' ? 0xffaa00 : 0x0066aa);
+          if (it.halo) it.halo.material.opacity = 0.18;
+          if (it.disc) it.disc.material.opacity = 0.25;
         }
       }
     },

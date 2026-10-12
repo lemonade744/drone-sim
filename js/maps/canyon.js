@@ -1,39 +1,45 @@
-const rings = [];
-// Каньон — узкий проход между скалами, кольца вдоль ущелья
-for (let i = 0; i < 10; i++) {
-  const t = i / 9;
-  rings.push({
-    x: Math.sin(t * Math.PI * 2) * 40,
-    z: -200 + t * 400,
-    y: 15 + Math.sin(t * Math.PI * 3) * 8,
-    radius: 3.2,
-    rotation: [0, t * Math.PI * 0.4, 0],
-  });
+// каньон: две стены по бокам, извилистые
+const buildings = [];
+// генерируем по 25 "зубов" вдоль Z
+for (let i = 0; i < 25; i++) {
+  const z = -240 + i * 20;
+  // левая стена
+  const offL = 25 + Math.sin(z * 0.05) * 8;  // извивается
+  buildings.push({ x: -offL, z, w: 12, h: 30 + Math.sin(z*0.03)*10, d: 12, color: 0x8a6d4a });
+  // правая стена
+  const offR = 25 + Math.cos(z * 0.07) * 8;
+  buildings.push({ x:  offR, z, w: 12, h: 32 + Math.cos(z*0.04)*10, d: 12, color: 0x8a6d4a });
 }
 
-// Скалы-стены с двух сторон
-const buildings = [];
-for (let i = 0; i < 20; i++) {
-  const z = -200 + i * 22;
-  const h = 25 + Math.random() * 25;
-  const offL = 30 + Math.random() * 20;
-  const offR = 30 + Math.random() * 20;
-  buildings.push({ x: -offL, z, w: 15, h, d: 15, color: 0x8a6d4a });
-  buildings.push({ x:  offR, z, w: 15, h: h + 5, d: 15, color: 0x8a6d4a });
+// кольца точно в центре ущелья, между стенами, на низкой высоте
+const rings = [];
+for (let i = 0; i < 12; i++) {
+  const t = i / 11;
+  const z = -230 + t * 460;
+  const offL = 25 + Math.sin(z * 0.05) * 8;
+  const offR = 25 + Math.cos(z * 0.07) * 8;
+  const cx = (offL - offR) / 2 + (offL - offR) * 0.1; // чуть не в центре — сложнее
+  rings.push({
+    x: cx,
+    z,
+    y: 12 + Math.sin(t * Math.PI * 3) * 4,
+    radius: 3.0,
+    rotation: [0, Math.sin(z * 0.02) * Math.PI * 0.3, 0],
+  });
 }
 
 export const canyon = {
   name: 'Каньон',
-  description: 'Узкое ущелье между скал. Пролети 10 колец вдоль каньона.',
+  description: 'Извилистое ущелье. 12 колец в узком проходе между скал — точность обязательна.',
   mode: 'rings',
   skyColor: 0xd4a56a,
   groundColor: 0xb08050,
-  groundBump: 1.8,
+  groundBump: 1.5,
   sunColor: 0xffd090,
   sunIntensity: 1.3,
   hemiIntensity: 0.6,
   ambIntensity: 0.35,
-  spawn: { x: 0, y: 20, z: -240 },
+  spawn: { x: 0, y: 20, z: -250, yaw: Math.PI },
   trees: [],
   buildings,
   stars: [],

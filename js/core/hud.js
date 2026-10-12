@@ -7,6 +7,7 @@ export class HUD {
       pitch: el('pitch'), roll: el('roll'), yaw: el('yaw'),
       thr: el('thr'), status: el('status'), cam: el('cam'),
       mapName: el('mapName'), modeName: el('modeName'),
+      modelName: el('modelName'),
       score: el('score'), scoreTotal: el('scoreTotal'),
       timer: el('timer'),
       msg: el('msg'), err: el('err'),
@@ -16,6 +17,7 @@ export class HUD {
     this.camModes = ['Следящая', 'От первого лица', 'Сверху'];
     this.score = 0;
     this.scoreTotal = 0;
+    this.currentModel = 'quadcopter';
 
     window.addEventListener('error', e => this.showError(e.error || e.message));
     window.addEventListener('unhandledrejection', e => this.showError(e.reason));
@@ -25,11 +27,12 @@ export class HUD {
     });
   }
 
-  setMap(name, mode, total) {
+  setMap(name, mode, total, modelName) {
     this.els.mapName.textContent = name;
     this.els.modeName.textContent =
       mode === 'stars' ? 'Сбор звёзд' :
       mode === 'rings' ? 'Полёт через кольца' : mode;
+    if (this.els.modelName) this.els.modelName.textContent = modelName || '—';
     this.score = 0;
     this.scoreTotal = total;
     this.els.score.textContent = '0';
@@ -91,9 +94,39 @@ export class HUD {
       flight.status === 'landed'  ? '#37ff7a' : '#0f0';
   }
 
-  // === Меню карт ===
-  showMenu(maps) {
+  // === Меню ===
+  showMenu(maps, models) {
     this.els.mapList.innerHTML = '';
+
+    // Секция моделей
+    if (models && models.length) {
+      const modelsSection = document.createElement('div');
+      modelsSection.className = 'menu-section';
+      modelsSection.innerHTML = '<h3>Модель дрона</h3>';
+      const modelRow = document.createElement('div');
+      modelRow.className = 'model-row';
+      models.forEach(m => {
+        const btn = document.createElement('div');
+        btn.className = 'model-card' + (m.key === this.currentModel ? ' active' : '');
+        btn.innerHTML = `<h4>${m.name}</h4><div class="desc">${m.description}</div>`;
+        btn.onclick = () => {
+          this.currentModel = m.key;
+          [...modelRow.children].forEach(c => c.classList.remove('active'));
+          btn.classList.add('active');
+          if (this._selectModel) this._selectModel(m.key);
+        };
+        modelRow.appendChild(btn);
+      });
+      modelsSection.appendChild(modelRow);
+      this.els.mapList.appendChild(modelsSection);
+    }
+
+    // Секция карт
+    const mapsSection = document.createElement('div');
+    mapsSection.className = 'menu-section';
+    mapsSection.innerHTML = '<h3>Карта</h3>';
+    const mapsRow = document.createElement('div');
+    mapsRow.className = 'map-row';
     maps.forEach(m => {
       const card = document.createElement('div');
       card.className = 'map-card';
@@ -103,13 +136,17 @@ export class HUD {
         <div class="mode">Режим: ${m.mode === 'stars' ? '⭐ звёзды' : '◎ кольца'}</div>
         <div class="count">Целей: ${m.mode === 'stars' ? m.stars?.length ?? 0 : m.rings?.length ?? 0}</div>
       `;
-      card.onclick = () => this._selectMap(m.key);
-      this.els.mapList.appendChild(card);
+      card.onclick = () => this._selectMap(m.key, this.currentModel);
+      mapsRow.appendChild(card);
     });
+    mapsSection.appendChild(mapsRow);
+    this.els.mapList.appendChild(mapsSection);
+
     this.els.menu.classList.remove('hidden');
   }
   hideMenu() { this.els.menu.classList.add('hidden'); }
   toggleMenu() { this.els.menu.classList.toggle('hidden'); }
 
   onMapSelected(handler) { this._selectMap = handler; }
+  onModelSelected(handler) { this._selectModel = handler; }
 }

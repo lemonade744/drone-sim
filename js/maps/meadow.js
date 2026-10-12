@@ -1,12 +1,11 @@
 const rings = [];
-// 8 колец по дуге, разной высоты
 for (let i = 0; i < 8; i++) {
   const angle = (i / 8) * Math.PI * 1.2 - Math.PI * 0.6;
   const radius = 60 + i * 8;
   rings.push({
     x: Math.cos(angle) * radius,
     z: Math.sin(angle) * radius,
-    y: 12 + Math.sin(i * 1.3) * 6,
+    y: 16 + Math.sin(i * 1.3) * 4,   // поднято с 12, ±6 до 16, ±4
     radius: 3.5,
     rotation: [0, angle + Math.PI / 2, 0],
   });
@@ -24,7 +23,7 @@ export const meadow = {
   hemiIntensity: 0.7,
   ambIntensity: 0.25,
 
-  spawn: { x: 0, y: 12, z: 30 },
+  spawn: { x: 0, y: 12, z: 30, yaw: 0 },
 
   trees: Array.from({ length: 80 }, () => {
     const a = Math.random() * Math.PI * 2;
