@@ -1,0 +1,15 @@
+# VS Code
+.vscode/
+*.code-workspace
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Node (если вдруг появится)
+node_modules/
+package-lock.json
+
+# Логи и временное
+*.log
+npm-debug.log*

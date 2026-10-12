@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<title>Drone Simulator</title>
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="hud">
+  <div>Высота: <span id="alt">0.0</span> м</div>
+  <div>Скорость: <span id="spd">0.0</span> м/с</div>
+  <div>Верт. скорость: <span id="vspd">0.0</span> м/с</div>
+  <div>Тангаж: <span id="pitch">0.0</span>°</div>
+  <div>Крен: <span id="roll">0.0</span>°</div>
+  <div>Курс: <span id="yaw">0.0</span>°</div>
+  <div>Газ: <span id="thr">50</span>%</div>
+  <div>Статус: <span id="status">Полёт</span></div>
+  <div>Камера: <span id="cam">Следящая</span></div>
+</div>
+
+<div id="scoreboard">
+  <div class="map-name">Карта: <span id="mapName">—</span></div>
+  <div class="mode-name">Режим: <span id="modeName">—</span></div>
+  <div class="score">Счёт: <span id="score">0</span> / <span id="scoreTotal">0</span></div>
+  <div class="timer">Время: <span id="timer">0.0</span> с</div>
+</div>
+
+<div id="crosshair"></div>
+<div id="msg"></div>
+<div id="err"></div>
+
+<div id="help">
+  <b>W / S</b> — газ вверх / вниз &nbsp;&nbsp; <b>A / D</b> — рыскание<br>
+  <b>↑ / ↓</b> — нос вперёд / назад &nbsp;&nbsp; <b>← / →</b> — крен<br>
+  <b>C</b> — камера &nbsp;&nbsp; <b>R</b> — респаун &nbsp;&nbsp; <b>M</b> — меню карт<br>
+  <span class="hint">Звёзды — собери все. Кольца — пролети через все по порядку.</span>
+</div>
+
+<div id="menu" class="hidden">
+  <h1>Drone Simulator</h1>
+  <div id="mapList"></div>
+  <div class="menu-hint">Клик по карте — запуск. Esc — продолжить.</div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+  }
+}
+</script>
+<script type="module" src="js/main.js"></script>
+</body>
+</html>
