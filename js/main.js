@@ -170,11 +170,8 @@ function update(dt) {
   if (camKeys.cycleCamera) ctx.hud.cycleCamera();
 
   if (camKeys.respawn) {
+    // R — только рестарт дрона. Прогресс (счёт, таймер, цели) НЕ сбрасывается.
     ctx.flight.respawn();
-    ctx.started = false;
-    ctx.elapsed = 0;
-    ctx.finished = false;
-    ctx.hud.setMap(ctx.currentMap.name, ctx.currentMap.mode, ctx.collectibles.items.length);
   }
 
   if (camKeys.menu) ctx.hud.toggleMenu();
