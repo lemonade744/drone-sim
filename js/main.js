@@ -95,7 +95,7 @@ function loadMap(mapKey) {
 
   ctx.flight = new Flight(drone, world.colliders, map);
 
-  const collectibles = buildCollectibles(map);
+  const collectibles = buildCollectibles(map, world.colliders);
   collectibles.items.forEach(it => ctx.scene.add(it.mesh));
   ctx.collectibles = collectibles;
 

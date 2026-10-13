@@ -9,8 +9,14 @@ import { snow } from './snow.js';
 import { volcano } from './volcano.js';
 import { skyscrapers } from './skyscrapers.js';
 import { labyrinth } from './labyrinth.js';
+import { randomCity } from './randomCity.js';
+import { randomMeadow } from './randomMeadow.js';
+import { randomMountains } from './randomMountains.js';
+import { randomDesert } from './randomDesert.js';
+import { randomForest } from './randomForest.js';
 
 export const maps = {
+  // обычные
   meadow:      { ...meadow,      key: 'meadow' },
   forest:      { ...forest,      key: 'forest' },
   islands:     { ...islands,     key: 'islands' },
@@ -22,4 +28,10 @@ export const maps = {
   city:        { ...city,        key: 'city' },
   night:       { ...night,       key: 'night' },
   skyscrapers: { ...skyscrapers, key: 'skyscrapers' },
+  // рандомные
+  randomMeadow:    { ...randomMeadow,    key: 'randomMeadow' },
+  randomForest:    { ...randomForest,    key: 'randomForest' },
+  randomCity:      { ...randomCity,      key: 'randomCity' },
+  randomMountains: { ...randomMountains, key: 'randomMountains' },
+  randomDesert:    { ...randomDesert,    key: 'randomDesert' },
 };

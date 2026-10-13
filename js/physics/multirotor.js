@@ -7,34 +7,30 @@ const VERT_DRAG = 0.15;
 const ANGULAR_DRAG = 3.2;
 const YAW_SPEED = 1.8;
 
-// Тангаж и крен больше не ограничены — можно перевернуться
-// MAX_PITCH и MAX_ROLL не используются
-
-// Параметры по типу
 const PARAMS = {
   quadcopter: {
     hoverThrust: GRAVITY,
-    maxThrust: GRAVITY * 2.0,
+    maxThrustUp: GRAVITY * 2.0,
+    maxThrustDown: GRAVITY * 1.6,
     pitchAccel: 4.0,
     rollAccel: 3.5,
   },
   octocopter: {
     hoverThrust: GRAVITY,
-    maxThrust: GRAVITY * 2.2,
+    maxThrustUp: GRAVITY * 2.2,
+    maxThrustDown: GRAVITY * 1.6,
     pitchAccel: 3.0,
     rollAccel: 2.8,
   },
 };
 
-// Множитель скорости при пикировании — небольшой бонус к горизонтальной скорости
 const DIVE_SPEED_BONUS = 1.35;
-// Порог pitch, при котором включается бонус (в радианах, ~30°)
 const DIVE_PITCH_THRESHOLD = Math.PI * 30 / 180;
 
 export function updateMultirotor(dt, ctrl, drone, state, status) {
   const params = PARAMS[drone.model.key] || PARAMS.quadcopter;
 
-  // Угловая динамика — без ограничений по углам
+  // Угловая динамика
   state.angVel.pitch += ctrl.pitch * params.pitchAccel * dt;
   state.angVel.roll  += ctrl.roll  * params.rollAccel  * dt;
   state.angVel.pitch *= Math.exp(-ANGULAR_DRAG * dt);
@@ -42,39 +38,63 @@ export function updateMultirotor(dt, ctrl, drone, state, status) {
 
   state.pitch += state.angVel.pitch * dt;
   state.roll  += state.angVel.roll  * dt;
-  // Убираем clamp на pitch и roll — можно свободно вращаться
 
   state.yaw += ctrl.yaw * YAW_SPEED * dt;
 
-  // Тяга
+  // === Газ симметричный ===
+  // W → тяга вверх по нормали, до maxThrustUp
+  // S → тяга "в обратную сторону" от нормали, до maxThrustDown
+  // Нейтраль = hoverThrust (держится только если нормаль вверх)
   let throttle;
-  if (ctrl.thrust > 0) throttle = params.hoverThrust + ctrl.thrust * (params.maxThrust - params.hoverThrust);
-  else if (ctrl.thrust < 0) throttle = params.hoverThrust * (1 + 0.9 * ctrl.thrust);
-  else throttle = params.hoverThrust;
+  if (ctrl.thrust > 0) {
+    // W: от hover до max вверх
+    throttle = params.hoverThrust + ctrl.thrust * (params.maxThrustUp - params.hoverThrust);
+  } else if (ctrl.thrust < 0) {
+    // S: от hover (0) до -maxThrustDown
+    // При нулевой тяге дрон не висит, а падает. При перевёрнутом корпусе
+    // отрицательная тяга тянет вверх — дрон взлетает.
+    throttle = params.hoverThrust + ctrl.thrust * params.maxThrustDown;
+    // ctrl.thrust = -1 → throttle = hover - maxDown = G - G = 0
+    // ctrl.thrust = -0.5 → throttle = G - 0.5G = 0.5G
+  } else {
+    // Нейтральное положение — висит
+    throttle = params.hoverThrust;
+  }
   throttle = Math.max(0, throttle);
   state.lastThrottle = throttle;
 
-  // Вектор тяги — по нормали корпуса
+  // Вектор тяги — по нормали корпуса (или против неё, если throttle < hover)
   const euler = new THREE.Euler(state.pitch, state.yaw, state.roll, 'YXZ');
   const thrustDir = new THREE.Vector3(0, 1, 0).applyEuler(euler);
 
   const acc = new THREE.Vector3();
-  acc.addScaledVector(thrustDir, throttle);
+  // Тяга = throttle по нормали корпуса. Всё остальное (гравитация) - отдельно.
+  // При нейтрали throttle = hover = G, тяга = G по нормали, гравитация -G вниз.
+  // Нормально горизонт: 0. Перевёрнут: тяга вниз, гравитация вниз → падение.
+  // При перевёрнутом корпусе и throttle=0 → тяга 0, гравитация -G → падение.
+  // Чтобы взлетать вверх ногами, нужно S: throttle < hover, тяга идёт "против"
+  // нормали → вверх в мировой системе. Но в нашей формуле throttle просто скаляр,
+  // он не может быть отрицательным, чтобы реально тянуть вниз нормали.
+  //
+  // Решение: интерпретируем "S" как вычитание из нейтральной тяги.
+  // Пусть thrustScalar = throttle - hoverThrust (может быть отрицательным).
+  // Это и есть "дополнительная тяга" относительно висящего положения.
+  const thrustScalar = throttle - params.hoverThrust;
+
+  // Тяга = (hover + thrustScalar) по нормали. Гравитация отдельно:
+  acc.addScaledVector(thrustDir, params.hoverThrust);
+  acc.addScaledVector(thrustDir, thrustScalar);
+
+  // Гравитация вниз
   acc.y -= GRAVITY;
 
-  // === Бонус горизонтальной скорости при пикировании ===
-  // Когда нос задран вперёд (pitch > 0 = нос вниз в нашей системе после всех
-  // преобразований, но ты пробовал управление — вот честный расчёт):
-  // pitch < 0 = нос вниз (пикирование). Усиливаем разгон вперёд.
+  // === Бонус скорости при пикировании ===
   let speedBonus = 1.0;
   const absPitch = Math.abs(state.pitch);
   if (absPitch > DIVE_PITCH_THRESHOLD) {
-    // Бонус растёт от 1.0 до DIVE_SPEED_BONUS по мере увеличения pitch
     const t = clamp((absPitch - DIVE_PITCH_THRESHOLD) / (Math.PI / 2 - DIVE_PITCH_THRESHOLD), 0, 1);
     speedBonus = 1.0 + (DIVE_SPEED_BONUS - 1.0) * t;
   }
-
-  // Применяем бонус к проекции ускорения на горизонталь
   const horizAcc = new THREE.Vector3(acc.x, 0, acc.z).multiplyScalar(speedBonus - 1);
   acc.x += horizAcc.x;
   acc.z += horizAcc.z;

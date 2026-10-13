@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { updateMultirotor } from './multirotor.js';
 import { updateAirplane } from './airplane.js';
+import { normalizeAngle } from '../utils/math.js';
 
 const GRAVITY = 9.81;
 const LAND_VSPEED_MAX = 4.0;
@@ -221,9 +222,16 @@ export class Flight {
     }
 
     // Сел
+        // Сел — держим
     if (this.status === 'landed') {
       if (ctrl.thrust > 0) {
+        // Взлёт: сбрасываем привязку и даём короткий вертикальный импульс,
+        // чтобы дрон сразу вышел из зоны посадки
         this.status = 'flying';
+        this.launchGraceTimer = 0.4;
+        state.vel.y = 3.5;
+        state.vel.x = 0;
+        state.vel.z = 0;
       } else {
         drone.group.position.y = this.standTop;
         state.vel.set(0, 0, 0);
@@ -267,11 +275,14 @@ export class Flight {
       const bottomY = py - this.drone.bottomOffset;
 
       if (objTop > 0.5 && bottomY <= objTop + 0.4) {
-        drone.group.position.y = objTop + this.drone.bottomOffset;
-        this.handleTouchdown(true, objTop + this.drone.bottomOffset);
+        // Мягкое "прилипание" — тянем Y к поверхности, не снэпом
+        const targetY = objTop + this.drone.bottomOffset;
+        drone.group.position.y += (targetY - drone.group.position.y) * Math.min(1, 12 * dt);
+        this.handleTouchdown(true, targetY);
       } else if (bottomY <= 0) {
-        drone.group.position.y = this.drone.bottomOffset;
-        this.handleTouchdown(false, this.drone.bottomOffset);
+        const targetY = this.drone.bottomOffset;
+        drone.group.position.y += (targetY - drone.group.position.y) * Math.min(1, 12 * dt);
+        this.handleTouchdown(false, targetY);
       }
     } else {
       if (drone.group.position.y < this.drone.bottomOffset) {
@@ -292,7 +303,12 @@ export class Flight {
   handleTouchdown(onObject, standY) {
     const { state, drone } = this;
     const vSpeed = Math.abs(state.vel.y);
-    const tilt = Math.max(Math.abs(state.pitch), Math.abs(state.roll));
+
+    // Нормализуем углы к [-π, π] — полный оборот = 0°, а не 360°
+    const pitchN = normalizeAngle(state.pitch);
+    const rollN  = normalizeAngle(state.roll);
+    const tilt = Math.max(Math.abs(pitchN), Math.abs(rollN));
+
     const horizSpeed = Math.hypot(state.vel.x, state.vel.z);
 
     const isPlane = drone.model.flightModel === 'airplane';
