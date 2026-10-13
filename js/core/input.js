@@ -38,6 +38,7 @@ export class Input {
       cycleCamera: this.consumePress('KeyC'),
       respawn:     this.consumePress('KeyR'),
       menu:        this.consumePress('KeyM'),
+      debug:       this.consumePress('KeyH'),
     };
   }
 }

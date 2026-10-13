@@ -14,17 +14,6 @@ export function createQuadcopter() {
   const cabin = new THREE.Mesh(new THREE.CylinderGeometry(0.32, 0.36, 0.22, 14), mid);
   cabin.position.y = 0.26; cabin.castShadow = true; group.add(cabin);
 
-  const stripe = new THREE.Mesh(new THREE.TorusGeometry(0.58, 0.04, 6, 24), accent);
-  stripe.rotation.x = Math.PI / 2; stripe.position.y = 0.06; group.add(stripe);
-
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.13, 0.4, 10), red);
-  nose.rotation.x = -Math.PI / 2; nose.position.set(0, 0, -0.75); group.add(nose);
-
-  const tailLight = new THREE.Mesh(
-    new THREE.SphereGeometry(0.07, 10, 10),
-    new THREE.MeshStandardMaterial({ color: 0xff3333, emissive: 0xff0000, emissiveIntensity: 1.5 })
-  );
-  tailLight.position.set(0, 0, 0.68); group.add(tailLight);
 
   const rotors = [];
   const armDefs = [
@@ -41,9 +30,6 @@ export function createQuadcopter() {
     motor.position.set(a.x * 1.35, 0.15, a.z * 1.35);
     motor.castShadow = true; group.add(motor);
 
-    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.16, 0.02, 6, 16), accent);
-    ring.rotation.x = Math.PI / 2;
-    ring.position.set(a.x * 1.35, 0.05, a.z * 1.35); group.add(ring);
 
     const rotor = new THREE.Group();
     const bladeMat = new THREE.MeshStandardMaterial({ color: 0x00ff88, emissive: 0x005522, metalness: 0.3, roughness: 0.6 });

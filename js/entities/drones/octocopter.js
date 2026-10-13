@@ -16,23 +16,6 @@ export function createOctocopter() {
   const cabin = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.55, 0.3, 16), mid);
   cabin.position.y = 0.36; cabin.castShadow = true; group.add(cabin);
 
-  // Двойное кольцо вокруг корпуса
-  const ring1 = new THREE.Mesh(new THREE.TorusGeometry(0.95, 0.05, 8, 32), accent);
-  ring1.rotation.x = Math.PI / 2; ring1.position.y = 0.08; group.add(ring1);
-  const ring2 = new THREE.Mesh(new THREE.TorusGeometry(0.85, 0.04, 8, 32), gold);
-  ring2.rotation.x = Math.PI / 2; ring2.position.y = -0.15; group.add(ring2);
-
-  // Нос
-  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.18, 0.5, 12), accent);
-  nose.rotation.x = -Math.PI / 2; nose.position.set(0, 0, -1.05); group.add(nose);
-
-  // Хвостовой маяк
-  const tailLight = new THREE.Mesh(
-    new THREE.SphereGeometry(0.1, 12, 12),
-    new THREE.MeshStandardMaterial({ color: 0xff5533, emissive: 0xff2200, emissiveIntensity: 2.0 })
-  );
-  tailLight.position.set(0, 0, 0.95); group.add(tailLight);
-
   // 8 лучей
   const rotors = [];
   for (let i = 0; i < 8; i++) {
@@ -52,11 +35,7 @@ export function createOctocopter() {
     motor.position.set(ax * armLen, 0.16, az * armLen);
     motor.castShadow = true; group.add(motor);
 
-    // Кольцо защиты винта
-    const guard = new THREE.Mesh(new THREE.TorusGeometry(0.35, 0.025, 6, 20), accent);
-    guard.rotation.x = Math.PI / 2;
-    guard.position.set(ax * armLen, 0.22, az * armLen);
-    group.add(guard);
+
 
     // Винт — 3 лопасти
     const rotor = new THREE.Group();

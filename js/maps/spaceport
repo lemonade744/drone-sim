@@ -1,0 +1,80 @@
+function randomStars({ colliders, isPointFree }) {
+  const stars = [];
+  const count = 10;
+  let attempts = 0;
+
+  while (stars.length < count && attempts < 500) {
+    attempts++;
+    const a = Math.random() * Math.PI * 2;
+    const r = 40 + Math.random() * 120;
+    const x = Math.cos(a) * r;
+    const z = Math.sin(a) * r;
+    const y = 12 + Math.random() * 25;
+
+    if (!isPointFree(x, y, z, colliders, 4)) continue;
+
+    let tooClose = false;
+    for (const s of stars) {
+      if (Math.hypot(s.x - x, s.z - z) < 25) { tooClose = true; break; }
+    }
+    if (tooClose) continue;
+
+    stars.push({ x, y, z });
+  }
+  return stars;
+}
+
+// Расстановка больших половых плит как "рулёжных дорожек"
+const models = [
+  // центральная гексагональная площадка
+  {
+    path: 'js/assets/models/aero_ground_hexagon.glb',
+    x: 0, y: 0, z: 0,
+    scale: 1,
+    rotationY: 0,
+    collider: false,   // плоская, коллайдер не нужен
+  },
+  // плитка вокруг площадки
+  { path: 'js/assets/models/floor_tiles_large.glb', x: -20, y: 0.02, z: 0, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_large.glb', x: 20, y: 0.02, z: 0, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_large.glb', x: 0, y: 0.02, z: -20, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_large.glb', x: 0, y: 0.02, z: 20, scale: 1, rotationY: 0, collider: false },
+
+  // средние плиты — дорожки от центра
+  { path: 'js/assets/models/floor_tiles_medium.glb', x: -40, y: 0.02, z: 0, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_medium.glb', x: 40, y: 0.02, z: 0, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_medium.glb', x: 0, y: 0.02, z: -40, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_medium.glb', x: 0, y: 0.02, z: 40, scale: 1, rotationY: 0, collider: false },
+
+  // маленькие плиты — по краям
+  { path: 'js/assets/models/floor_tiles_small.glb', x: -60, y: 0.02, z: -20, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_small.glb', x: 60, y: 0.02, z: -20, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_small.glb', x: -60, y: 0.02, z: 20, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/floor_tiles_small.glb', x: 60, y: 0.02, z: 20, scale: 1, rotationY: 0, collider: false },
+
+  // арки-двери вокруг площадки — через них можно пролетать
+  { path: 'js/assets/models/aero_door_01.glb', x: 35, y: 0, z: 0, scale: 1, rotationY: Math.PI / 2, collider: false },
+  { path: 'js/assets/models/aero_door_01.glb', x: -35, y: 0, z: 0, scale: 1, rotationY: -Math.PI / 2, collider: false },
+  { path: 'js/assets/models/aero_door_01.glb', x: 0, y: 0, z: 35, scale: 1, rotationY: 0, collider: false },
+  { path: 'js/assets/models/aero_door_01.glb', x: 0, y: 0, z: -35, scale: 1, rotationY: Math.PI, collider: false },
+];
+
+export const spaceport = {
+  name: 'Космодром',
+  description: 'Аэрокосмическая площадка. 10 звёзд вокруг гексагональной платформы и арок.',
+  mode: 'stars',
+  skyColor: 0x1a2540,
+  groundColor: 0x2a3040,
+  groundBump: 0.05,
+  sunColor: 0xaac4ff,
+  sunIntensity: 0.9,
+  hemiIntensity: 0.4,
+  ambIntensity: 0.35,
+  spawn: { x: 0, y: 20, z: 90, yaw: 0 },
+  trees: [],
+  buildings: [],
+  models,
+  randomStars,
+  stars: [],
+  rings: [],
+};

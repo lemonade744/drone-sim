@@ -39,20 +39,29 @@ export class Flight {
 
     if (this.drone.model.startOnGround) {
       this._placeOnCatapult();
+    } else if (this.map.spawn?.onGround === true) {
+      this._placeOnGroundSurface();
     }
   }
 
   findSafeSpawn() {
     const startOnGround = this.drone.model.startOnGround;
+    const spawnOnGround = this.map.spawn?.onGround === true;
     const preferred = this.map.spawn ?? { x: 0, y: 12, z: 0 };
-    const preferredY = startOnGround ? this.drone.bottomOffset : preferred.y;
+
+    const preferredY = spawnOnGround
+      ? (preferred.y ?? this.drone.bottomOffset)
+      : (startOnGround ? this.drone.bottomOffset : preferred.y);
 
     if (this._isFree(preferred.x, preferredY, preferred.z)) {
       return { x: preferred.x, y: preferredY, z: preferred.z };
     }
 
     const cx = preferred.x, cz = preferred.z;
-    const cy = startOnGround ? this.drone.bottomOffset : Math.max(preferred.y, 20);
+    const cy = (startOnGround || spawnOnGround)
+      ? this.drone.bottomOffset
+      : Math.max(preferred.y, 20);
+
     for (let ring = 1; ring <= 20; ring++) {
       const r = ring * 8;
       const steps = Math.max(8, ring * 6);
@@ -63,20 +72,25 @@ export class Flight {
         if (this._isFree(x, cy, z)) return { x, y: cy, z };
       }
     }
+
     let maxTop = 0;
     for (const c of this.colliders) if (c.top > maxTop) maxTop = c.top;
     return {
       x: 0,
-      y: startOnGround ? this.drone.bottomOffset : maxTop + 25,
+      y: (startOnGround || spawnOnGround) ? this.drone.bottomOffset : maxTop + 25,
       z: 0,
     };
   }
 
   _isFree(x, y, z) {
-    if (this.drone.model.startOnGround) {
+    const onGroundMode = this.drone.model.startOnGround || this.map.spawn?.onGround === true;
+
+    if (onGroundMode) {
       for (const c of this.colliders) {
+        if (c.bottom !== undefined) continue;    // балки не мешают
         const dx = x - c.x, dz = z - c.z;
-        const rr = c.r + DRONE_RADIUS + 1.5;
+        const r = c.r ?? Math.max(c.hw ?? 0, c.hd ?? 0);
+        const rr = r + DRONE_RADIUS + 1.5;
         if (dx*dx + dz*dz >= rr*rr) continue;
         if (c.top > y - this.drone.bottomOffset + 0.5) return false;
       }
@@ -86,8 +100,10 @@ export class Flight {
     if (y < 3) return false;
     const droneBottom = y - this.drone.bottomOffset;
     for (const c of this.colliders) {
+      if (c.bottom !== undefined) continue;
       const dx = x - c.x, dz = z - c.z;
-      const rr = c.r + DRONE_RADIUS + 0.5;
+      const r = c.r ?? Math.max(c.hw ?? 0, c.hd ?? 0);
+      const rr = r + DRONE_RADIUS + 0.5;
       if (dx*dx + dz*dz >= rr*rr) continue;
       if (droneBottom >= c.top + 0.5) continue;
       return false;
@@ -109,16 +125,37 @@ export class Flight {
     this.drone.group.rotation.set(0, yaw, 0, 'YXZ');
   }
 
+  _placeOnGroundSurface() {
+    const sp = this.spawnPoint;
+    const yaw = this.map.spawn?.yaw ?? 0;
+    const top = this.surfaceTopUnder(sp.x, sp.z);
+    const standY = top > 0.5
+      ? top + this.drone.bottomOffset
+      : this.drone.bottomOffset;
+
+    this.drone.group.position.set(sp.x, standY, sp.z);
+    this.drone.group.rotation.set(0, yaw, 0, 'YXZ');
+
+    this.state.vel.set(0, 0, 0);
+    this.state.yaw = yaw;
+    this.state.pitch = 0;
+    this.state.roll = 0;
+    this.state.angVel.pitch = 0;
+    this.state.angVel.roll = 0;
+    this.state.angVel.yaw = 0;
+
+    this.status = 'landed';
+    this.standTop = standY;
+  }
+
   _placeOnCatapult() {
     const sp = this.spawnPoint;
     const yaw = this.map.spawn?.yaw ?? 0;
-    // Угол катапульты: +20° — нос вверх (положительный pitch = нос вверх)
     const launchPitch = +20 * Math.PI / 180;
 
     this.catapultPitch = launchPitch;
     this.catapultYaw = yaw;
 
-    // Дрон на верхней части катапульты
     this.catapultPos.set(sp.x, this.drone.bottomOffset + 0.8, sp.z);
     this.drone.group.position.copy(this.catapultPos);
     this.drone.group.rotation.set(this.catapultPitch, this.catapultYaw, 0, 'YXZ');
@@ -136,7 +173,6 @@ export class Flight {
   }
 
   launchFromCatapult() {
-    // Умеренная скорость — 14 м/с
     const launchSpeed = 14;
     const euler = new THREE.Euler(this.catapultPitch, this.catapultYaw, 0, 'YXZ');
     const forward = new THREE.Vector3(0, 0, -1).applyEuler(euler);
@@ -154,17 +190,42 @@ export class Flight {
     this._placeAtSpawn();
     if (this.drone.model.startOnGround) {
       this._placeOnCatapult();
+    } else if (this.map.spawn?.onGround === true) {
+      this._placeOnGroundSurface();
     }
   }
 
   hitsObstacle(px, py, pz) {
     const bottomY = py - this.drone.bottomOffset;
+    const topY = py + 0.4;
+
     for (const c of this.colliders) {
-      if (bottomY >= c.top - 0.05) continue;
+      // Вертикальная проверка
+      if (c.bottom !== undefined) {
+        if (topY < c.bottom) continue;
+        if (bottomY >= c.top) continue;
+      } else {
+        if (bottomY >= c.top - 0.4) continue;
+      }
+
       const dx = px - c.x;
       const dz = pz - c.z;
-      const rr = c.r + DRONE_RADIUS;
-      if (dx*dx + dz*dz < rr*rr) return true;
+
+      if (c.type === 'box') {
+        // Вращаем в локальную систему коллайдера
+        const cos = Math.cos(c.rot ?? 0);
+        const sin = Math.sin(c.rot ?? 0);
+        const localX = dx * cos - dz * sin;
+        const localZ = dx * sin + dz * cos;
+        if (Math.abs(localX) < c.hw + DRONE_RADIUS &&
+            Math.abs(localZ) < c.hd + DRONE_RADIUS) {
+          return true;
+        }
+      } else {
+        // Цилиндр
+        const rr = c.r + DRONE_RADIUS;
+        if (dx*dx + dz*dz < rr*rr) return true;
+      }
     }
     return false;
   }
@@ -172,6 +233,8 @@ export class Flight {
   surfaceTopUnder(px, pz) {
     let best = 0;
     for (const c of this.colliders) {
+      if (c.bottom !== undefined) continue;    // балки не поверхность
+      if (c.type === 'box') continue;          // для простоты — box тоже не садимся
       const dx = px - c.x, dz = pz - c.z;
       const rr = c.r + DRONE_RADIUS * 0.6;
       if (dx*dx + dz*dz < rr*rr && c.top > best) best = c.top;
@@ -184,7 +247,6 @@ export class Flight {
 
     if (this.launchGraceTimer > 0) this.launchGraceTimer -= dt;
 
-    // Упавший
     if (this.status === 'crashed') {
       state.vel.x *= 0.95;
       state.vel.z *= 0.95;
@@ -201,7 +263,6 @@ export class Flight {
       return;
     }
 
-    // На катапульте
     if (this.status === 'on_catapult') {
       drone.group.position.copy(this.catapultPos);
       drone.group.rotation.set(this.catapultPitch, this.catapultYaw, 0, 'YXZ');
@@ -221,12 +282,8 @@ export class Flight {
       }
     }
 
-    // Сел
-        // Сел — держим
     if (this.status === 'landed') {
       if (ctrl.thrust > 0) {
-        // Взлёт: сбрасываем привязку и даём короткий вертикальный импульс,
-        // чтобы дрон сразу вышел из зоны посадки
         this.status = 'flying';
         this.launchGraceTimer = 0.4;
         state.vel.y = 3.5;
@@ -243,7 +300,6 @@ export class Flight {
       }
     }
 
-    // Физика
     if (drone.model.flightModel === 'airplane') {
       updateAirplane(dt, ctrl, drone, state, this.status);
     } else {
@@ -259,7 +315,6 @@ export class Flight {
     const py = drone.group.position.y;
     const pz = drone.group.position.z;
 
-    // Коллизия с объектами
     if (this.hitsObstacle(px, py, pz)) {
       drone.group.position.set(prevX, prevY, prevZ);
       state.vel.multiplyScalar(0.2);
@@ -269,13 +324,11 @@ export class Flight {
       return;
     }
 
-    // Касание земли / поверхности (только если grace-таймер кончился)
     if (this.launchGraceTimer <= 0) {
       const objTop = this.surfaceTopUnder(px, pz);
       const bottomY = py - this.drone.bottomOffset;
 
       if (objTop > 0.5 && bottomY <= objTop + 0.4) {
-        // Мягкое "прилипание" — тянем Y к поверхности, не снэпом
         const targetY = objTop + this.drone.bottomOffset;
         drone.group.position.y += (targetY - drone.group.position.y) * Math.min(1, 12 * dt);
         this.handleTouchdown(true, targetY);
@@ -291,7 +344,6 @@ export class Flight {
       }
     }
 
-    // Потолок карты
     if (drone.group.position.y > 300) {
       drone.group.position.y = 300;
       if (state.vel.y > 0) state.vel.y = 0;
@@ -304,19 +356,18 @@ export class Flight {
     const { state, drone } = this;
     const vSpeed = Math.abs(state.vel.y);
 
-    // Нормализуем углы к [-π, π] — полный оборот = 0°, а не 360°
     const pitchN = normalizeAngle(state.pitch);
-    const rollN  = normalizeAngle(state.roll);
+    const rollN = normalizeAngle(state.roll);
     const tilt = Math.max(Math.abs(pitchN), Math.abs(rollN));
 
     const horizSpeed = Math.hypot(state.vel.x, state.vel.z);
 
     const isPlane = drone.model.flightModel === 'airplane';
-    const maxTilt    = isPlane ? Math.PI * 20 / 180 : LAND_TILT_MAX;
-    const maxVSpeed  = isPlane ? 5 : LAND_VSPEED_MAX;
-    const maxHSpeed  = isPlane ? 25 : 3;
-    const crashVSpeed = isPlane ? 10 : CRASH_VSPEED;
-    const crashHSpeed = isPlane ? 45 : 6;
+    const maxTilt = isPlane ? Math.PI * 20 / 180 : LAND_TILT_MAX;
+    const maxVSpeed = isPlane ? 5 : LAND_VSPEED_MAX;
+    const maxHSpeed = isPlane ? 25 : 6;
+    const crashVSpeed = isPlane ? 10 : 10;
+    const crashHSpeed = isPlane ? 45 : 14;
 
     const doCrash =
       vSpeed > crashVSpeed ||

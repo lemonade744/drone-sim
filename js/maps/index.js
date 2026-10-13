@@ -16,7 +16,6 @@ import { randomDesert } from './randomDesert.js';
 import { randomForest } from './randomForest.js';
 
 export const maps = {
-  // обычные
   meadow:      { ...meadow,      key: 'meadow' },
   forest:      { ...forest,      key: 'forest' },
   islands:     { ...islands,     key: 'islands' },
@@ -28,7 +27,6 @@ export const maps = {
   city:        { ...city,        key: 'city' },
   night:       { ...night,       key: 'night' },
   skyscrapers: { ...skyscrapers, key: 'skyscrapers' },
-  // рандомные
   randomMeadow:    { ...randomMeadow,    key: 'randomMeadow' },
   randomForest:    { ...randomForest,    key: 'randomForest' },
   randomCity:      { ...randomCity,      key: 'randomCity' },
