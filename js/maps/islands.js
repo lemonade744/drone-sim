@@ -10,30 +10,29 @@ const rings = [
   { x:   0, y: 45, z:   0, radius: 4.0, rotation: [Math.PI/2, 0, 0] },
 ];
 
+const models = [
+  {
+    path: 'js/assets/models/Water_Pond_01_Art.glb',
+    x: 0, y: 0.1, z: 0,   // чуть выше земли
+    scale: 30,             // подберём по скрину
+    rotationY: 0,
+    collider: false,
+  },
+];
+
 export const islands = {
   name: 'Острова',
   description: 'Тропический архипелаг. Пролети 9 колец по кругу + финальное сверху.',
   mode: 'rings',
   skyColor: 0x6fc5e8,
   groundColor: 0x2a8a9a,
-  groundBump: 0.4,
+  groundBump: 0,
   sunColor: 0xfff0d0,
   sunIntensity: 1.3,
   hemiIntensity: 0.8,
   ambIntensity: 0.3,
   spawn: { x: 0, y: 20, z: 90, yaw: 0 },
-  trees: Array.from({ length: 60 }, () => {
-    const a = Math.random() * Math.PI * 2;
-    const r = 30 + Math.random() * 200;
-    return {
-      x: Math.cos(a) * r,
-      z: Math.sin(a) * r,
-      trunkR: 0.3,
-      trunkH: 3 + Math.random() * 2,
-      coneR: 2.5,
-      coneH: 5,
-    };
-  }),
+  trees: [],
   buildings: [
     // "пальмы"-острова в виде холмиков
     { x:  50, z:   0, w: 20, h: 3, d: 20, color: 0x4a9a5a },
@@ -47,4 +46,5 @@ export const islands = {
   ],
   stars: [],
   rings,
+  models,
 };

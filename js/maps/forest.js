@@ -15,6 +15,16 @@ for (let i = 0; i < 14; i++) {
   });
 }
 
+const models = [
+  {
+    path: 'js/assets/models/Floor.glb',
+    x: 0, y: 0, z: 0,
+    scale: 40,       // ← подберём: если модель 10×10 м, при 40 = 400×400
+    rotationY: 0,
+    collider: false,
+  },
+];
+
 // деревья вокруг колец, с зазором 8-15 м (пролетать можно, но впритык)
 for (let i = 0; i < 300; i++) {
   const a = Math.random() * Math.PI * 2;
@@ -51,6 +61,7 @@ export const forest = {
   ambIntensity: 0.35,
   spawn: { x: 0, y: 15, z: 0, yaw: 0 },
   trees,
+  models,
   buildings: [],
   stars: [],
   rings,

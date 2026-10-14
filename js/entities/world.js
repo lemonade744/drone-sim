@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { loadModel, cloneModel, getModelCollider } from './assetLoader.js';
+import { loadTexture } from './textureLoader.js';
 
 export async function buildWorld(map) {
   const objects = [];
@@ -16,14 +17,45 @@ export async function buildWorld(map) {
   groundGeo.computeVertexNormals();
 
   const groundColor = map.groundColor ?? 0x3f7a3f;
-  const ground = new THREE.Mesh(
-    groundGeo,
-    new THREE.MeshLambertMaterial({ color: groundColor })
-  );
+
+  let groundMat;
+  if (map.groundTexture) {
+    const tex = loadTexture(map.groundTexture, 40, 40);
+    groundMat = new THREE.MeshLambertMaterial({ map: tex });
+  } else {
+    groundMat = new THREE.MeshLambertMaterial({ color: groundColor });
+  }
+
+  const ground = new THREE.Mesh(groundGeo, groundMat);
   ground.rotation.x = -Math.PI / 2;
   ground.receiveShadow = true;
   objects.push(ground);
 
+  // === Дороги ===
+  if (map.roads && map.roads.length) {
+    const roadTex = map.roadTexture
+      ? loadTexture(map.roadTexture, 20, 20)
+      : null;
+
+    for (const road of map.roads) {
+      const w = road.w ?? 10;
+      const d = road.d ?? 10;
+      const geo = new THREE.PlaneGeometry(w, d);
+      const mat = roadTex
+        ? new THREE.MeshLambertMaterial({ map: roadTex })
+        : new THREE.MeshLambertMaterial({ color: 0x2a2a2e });
+
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.rotation.order = 'YXZ';
+      mesh.rotation.x = -Math.PI / 2;
+      mesh.rotation.z = road.rotationY ?? 0;
+      mesh.position.set(road.x ?? 0, (road.y ?? 0) + 0.1, road.z ?? 0);
+      mesh.receiveShadow = true;
+      objects.push(mesh);
+    }
+  }
+
+  // === Сетка ===
   if (!map.hideGrid) {
     const grid = new THREE.GridHelper(400, 40, 0x224422, 0x224422);
     grid.position.y = 0.05;
@@ -39,9 +71,9 @@ export async function buildWorld(map) {
     colliders.push(g.collider);
   });
 
-  // === Здания ===
+  // === Здания (процедурные) — box-коллайдеры ===
   (map.buildings ?? []).forEach(b => {
-    const bld = makeBuilding(b);
+    const bld = makeBuilding(b, map.wallTexture);
     objects.push(bld.mesh);
     colliders.push(bld.collider);
   });
@@ -67,9 +99,7 @@ export async function buildWorld(map) {
         if (modelDef.collider !== false) {
           if (modelDef.collider === 'auto' || modelDef.collider === undefined) {
             const col = getModelCollider(inst, modelDef.x ?? 0, modelDef.z ?? 0);
-            if (col.r > 1 && col.top > 0.5) {
-              colliders.push(col);
-            }
+            if (col.r > 1 && col.top > 0.5) colliders.push(col);
           } else if (typeof modelDef.collider === 'object') {
             colliders.push({
               x: modelDef.collider.x ?? modelDef.x,
@@ -85,7 +115,7 @@ export async function buildWorld(map) {
     }
   }
 
-  // === Прямые коллайдеры из карты ===
+  // === Прямые коллайдеры ===
   if (map.extraColliders && map.extraColliders.length > 0) {
     for (const c of map.extraColliders) {
       colliders.push({ ...c, r: c.r ?? 1, top: c.top ?? 10 });
@@ -118,16 +148,34 @@ function makeTree({ x, z, trunkR = 0.3, trunkH = 3, coneR = 2, coneH = 4 }) {
   };
 }
 
-function makeBuilding({ x, z, w, h, d, color = 0x888899 }) {
-  const mesh = new THREE.Mesh(
-    new THREE.BoxGeometry(w, h, d),
-    new THREE.MeshLambertMaterial({ color })
-  );
+// === Здание с box-коллайдером ===
+function makeBuilding({ x, z, w, h, d, color = 0x888899, rotationY = 0 }, wallTexture = null) {
+  let mat;
+  if (wallTexture) {
+    const tex = loadTexture(wallTexture.path, wallTexture.repeat ?? 2, wallTexture.repeat ?? 2);
+    mat = new THREE.MeshLambertMaterial({ map: tex });
+  } else {
+    mat = new THREE.MeshLambertMaterial({ color });
+  }
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   mesh.position.set(x, h / 2, z);
+  mesh.rotation.y = rotationY;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
-  const r = Math.max(w, d) * 0.55;
-  return { mesh, collider: { x, z, r, top: h } };
+
+  // box-коллайдер: половина ширины (hw), половина глубины (hd), поворот
+  return {
+    mesh,
+    collider: {
+      type: 'box',
+      x,
+      z,
+      hw: w / 2,
+      hd: d / 2,
+      rot: rotationY,
+      top: h,
+    },
+  };
 }
 
 export function isPointFree(x, y, z, colliders, radius = 3) {

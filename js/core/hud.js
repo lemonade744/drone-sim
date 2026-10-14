@@ -62,7 +62,7 @@ export class HUD {
   hideMessage() { this.els.msg.className = ''; }
 
   showFinal(t) {
-    this.showMessage(`🏁 ФИНИШ\nВремя: ${t.toFixed(2)} с\nНажмите M для меню`, 'info');
+    this.showMessage(`ФИНИШ\nВремя: ${t.toFixed(2)} с\nНажмите M для меню`, 'info');
   }
 
   showError(e) {
@@ -133,7 +133,7 @@ export class HUD {
       card.innerHTML = `
         <h2>${m.name}</h2>
         <div class="desc">${m.description || ''}</div>
-        <div class="mode">Режим: ${m.mode === 'stars' ? '⭐ звёзды' : '◎ кольца'}</div>
+        <div class="mode">Режим: ${m.mode === 'stars' ? 'звёзды' : 'кольца'}</div>
         <div class="count">Целей: ${m.mode === 'stars' ? m.stars?.length ?? 0 : m.rings?.length ?? 0}</div>
       `;
       card.onclick = () => this._selectMap(m.key, this.currentModel);

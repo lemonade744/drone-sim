@@ -30,12 +30,12 @@ const buildings = [
   { x:  80, z: -30, w: 20, h: 18, d: 20, color: 0xb87040 },
 ];
 
-// Звёзды внутри арок — по одной на арку
+// Звёзды внутри арок
 const archStars = [
-  { x:  20, y: 5, z:   0 },   // арка справа
-  { x: -20, y: 5, z:   0 },   // арка слева
-  { x:   0, y: 5, z:  20 },   // арка спереди (по +Z)
-  { x:   0, y: 5, z: -20 },   // арка сзади (по -Z)
+  { x:  20, y: 5, z:   0 },
+  { x: -20, y: 5, z:   0 },
+  { x:   0, y: 5, z:  20 },
+  { x:   0, y: 5, z: -20 },
 ];
 
 const PLATFORM_X = 0;
@@ -52,7 +52,7 @@ const models = [];
 for (let gx = -TILE_GRID / 2; gx < TILE_GRID / 2; gx++) {
   for (let gz = -TILE_GRID / 2; gz < TILE_GRID / 2; gz++) {
     models.push({
-      path: 'js/assets/models/floor_tiles_large.glb',
+      path: 'js/assets/models/Floor_Tiles_Large.glb',
       x: (gx + 0.5) * TILE_STEP,
       y: TILE_Y,
       z: (gz + 0.5) * TILE_STEP,
@@ -82,7 +82,7 @@ const archData = [
 
 for (const arch of archData) {
   models.push({
-    path: 'js/assets/models/aero_door_01.glb',
+    path: 'js/assets/models/Aero_Door_01.glb',
     x: arch.x, y: 0, z: arch.z,
     scale: 1,
     rotationY: arch.rot,
@@ -93,12 +93,10 @@ for (const arch of archData) {
 // === Коллайдеры арок ===
 const extraColliders = [];
 
-// Ноги — цилиндры
 const LEG_OFFSET = 9.0;
 const LEG_RADIUS = 0.9;
 const ARCH_TOP = 10;
 
-// Верхняя перекладина — параллелепипед
 const BEAM_HW = 8.5;
 const BEAM_HD = 1;
 const BEAM_BOTTOM = 12;
@@ -108,7 +106,6 @@ for (const arch of archData) {
   const cosR = Math.cos(arch.rot);
   const sinR = Math.sin(arch.rot);
 
-  // Ноги
   for (const sign of [1, -1]) {
     const localX = sign * LEG_OFFSET;
     const worldX = arch.x + localX * cosR;
@@ -122,7 +119,6 @@ for (const arch of archData) {
     });
   }
 
-  // Перекладина сверху
   extraColliders.push({
     type: 'box',
     x: arch.x,
@@ -137,7 +133,7 @@ for (const arch of archData) {
 
 export const desert = {
   name: 'Пустыня',
-  description: 'Пустыня с пирамидами и заброшенным космодромом. 11 звёзд вокруг площадки.',
+  description: 'Пустыня с пирамидами и заброшенным космодромом. 12 звёзд.',
   mode: 'stars',
   skyColor: 0xf0c890,
   groundColor: 0xd4a868,

@@ -14,6 +14,7 @@ import { randomMeadow } from './randomMeadow.js';
 import { randomMountains } from './randomMountains.js';
 import { randomDesert } from './randomDesert.js';
 import { randomForest } from './randomForest.js';
+import { spaceport } from './spaceport.js';
 
 export const maps = {
   meadow:      { ...meadow,      key: 'meadow' },
@@ -27,6 +28,7 @@ export const maps = {
   city:        { ...city,        key: 'city' },
   night:       { ...night,       key: 'night' },
   skyscrapers: { ...skyscrapers, key: 'skyscrapers' },
+  spaceport:   { ...spaceport,   key: 'spaceport' },
   randomMeadow:    { ...randomMeadow,    key: 'randomMeadow' },
   randomForest:    { ...randomForest,    key: 'randomForest' },
   randomCity:      { ...randomCity,      key: 'randomCity' },

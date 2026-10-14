@@ -122,6 +122,7 @@ async function loadMap(mapKey) {
   world.objects.forEach(o => ctx.scene.add(o));
   ctx.world = world;
 
+
   // Debug-группа
   const debugGroup = buildDebugGroup(world.colliders);
   ctx.scene.add(debugGroup);

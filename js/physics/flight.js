@@ -87,7 +87,7 @@ export class Flight {
 
     if (onGroundMode) {
       for (const c of this.colliders) {
-        if (c.bottom !== undefined) continue;    // балки не мешают
+        if (c.bottom !== undefined) continue;
         const dx = x - c.x, dz = z - c.z;
         const r = c.r ?? Math.max(c.hw ?? 0, c.hd ?? 0);
         const rr = r + DRONE_RADIUS + 1.5;
@@ -195,6 +195,7 @@ export class Flight {
     }
   }
 
+  // === Проверка попадания в коллайдер ===
   hitsObstacle(px, py, pz) {
     const bottomY = py - this.drone.bottomOffset;
     const topY = py + 0.4;
@@ -212,7 +213,6 @@ export class Flight {
       const dz = pz - c.z;
 
       if (c.type === 'box') {
-        // Вращаем в локальную систему коллайдера
         const cos = Math.cos(c.rot ?? 0);
         const sin = Math.sin(c.rot ?? 0);
         const localX = dx * cos - dz * sin;
@@ -222,7 +222,6 @@ export class Flight {
           return true;
         }
       } else {
-        // Цилиндр
         const rr = c.r + DRONE_RADIUS;
         if (dx*dx + dz*dz < rr*rr) return true;
       }
@@ -230,14 +229,34 @@ export class Flight {
     return false;
   }
 
+  // === Верхняя поверхность под дроном (для посадки) ===
   surfaceTopUnder(px, pz) {
     let best = 0;
+
     for (const c of this.colliders) {
-      if (c.bottom !== undefined) continue;    // балки не поверхность
-      if (c.type === 'box') continue;          // для простоты — box тоже не садимся
-      const dx = px - c.x, dz = pz - c.z;
-      const rr = c.r + DRONE_RADIUS * 0.6;
-      if (dx*dx + dz*dz < rr*rr && c.top > best) best = c.top;
+      // Балки (у которых bottom задан) не считаем поверхностью для посадки
+      if (c.bottom !== undefined) continue;
+
+      const dx = px - c.x;
+      const dz = pz - c.z;
+
+      if (c.type === 'box') {
+        // Повернуть точку в локальную систему коллайдера
+        const cos = Math.cos(c.rot ?? 0);
+        const sin = Math.sin(c.rot ?? 0);
+        const localX = dx * cos - dz * sin;
+        const localZ = dx * sin + dz * cos;
+
+        // Дрон внутри box по XZ (с запасом)
+        if (Math.abs(localX) < c.hw + DRONE_RADIUS * 0.6 &&
+            Math.abs(localZ) < c.hd + DRONE_RADIUS * 0.6) {
+          if (c.top > best) best = c.top;
+        }
+      } else {
+        // Цилиндр
+        const rr = c.r + DRONE_RADIUS * 0.6;
+        if (dx*dx + dz*dz < rr*rr && c.top > best) best = c.top;
+      }
     }
     return best;
   }
